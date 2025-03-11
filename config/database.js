@@ -1,7 +1,6 @@
 const mysql = require("mysql2/promise");
 require("dotenv").config();
 
-// Configurazione del pool di connessioni
 const pool = mysql.createPool({
   host: process.env.DB_HOST || "localhost",
   user: process.env.DB_USER || "root",
@@ -12,7 +11,6 @@ const pool = mysql.createPool({
   queueLimit: 0,
 });
 
-// Test della connessione al database
 async function testConnection() {
   try {
     const connection = await pool.getConnection();
@@ -25,7 +23,6 @@ async function testConnection() {
   }
 }
 
-// Esecuzione di query con parametri (prepared statement)
 async function query(sql, params) {
   try {
     const [results] = await pool.execute(sql, params);
@@ -36,7 +33,6 @@ async function query(sql, params) {
   }
 }
 
-// Esportazione delle funzioni
 module.exports = {
   pool,
   query,

@@ -27,7 +27,7 @@ class Goal {
 
   /**
    * Trova un obiettivo per ID
-   * @param {number} id - ID dell'obiettivo
+   * @param {number} id
    * @returns {Promise<Object|null>}
    */
   static async findById(id) {
@@ -58,7 +58,7 @@ class Goal {
 
   /**
    * Aggiorna un obiettivo
-   * @param {number} id - ID dell'obiettivo
+   * @param {number} id
    * @param {Object} goalData
    * @returns {Promise<Object|null>}
    */
@@ -101,7 +101,7 @@ class Goal {
 
   /**
    * Elimina un obiettivo
-   * @param {number} id - ID dell'obiettivo
+   * @param {number} id
    * @returns {Promise<boolean>}
    */
   static async delete(id) {
