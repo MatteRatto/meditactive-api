@@ -3,6 +3,7 @@ const sinon = require("sinon");
 const intervalController = require("../controllers/intervalController");
 const Interval = require("../models/Interval");
 const User = require("../models/User");
+const Goal = require("../models/Goal");
 const IntervalGoal = require("../models/IntervalGoal");
 
 describe("Interval Controller", () => {
@@ -13,7 +14,10 @@ describe("Interval Controller", () => {
     createStub,
     findAllStub,
     updateStub,
-    deleteStub;
+    deleteStub,
+    countStub,
+    countGoalsStub,
+    getGoalsStub;
   let userFindByIdStub, intervalGoalAssociateStub;
 
   beforeEach(() => {
@@ -24,6 +28,9 @@ describe("Interval Controller", () => {
     if (deleteStub) deleteStub.restore();
     if (userFindByIdStub) userFindByIdStub.restore();
     if (intervalGoalAssociateStub) intervalGoalAssociateStub.restore();
+    if (countStub) countStub.restore();
+    if (countGoalsStub) countGoalsStub.restore();
+    if (getGoalsStub) getGoalsStub.restore();
 
     req = {
       body: {},
@@ -162,42 +169,60 @@ describe("Interval Controller", () => {
   });
 
   describe("getAll", () => {
-    it("dovrebbe ottenere tutti gli intervalli con successo", async () => {
+    it("dovrebbe ottenere tutti gli intervalli con paginazione", async () => {
+      req.query = { page: 1, limit: 10 };
+
       const intervals = [
         {
           id: 1,
           startDate: "2023-09-01",
           endDate: "2023-09-30",
           userId: 1,
-          user: {},
-          goals: [],
         },
         {
           id: 2,
           startDate: "2023-10-01",
           endDate: "2023-10-31",
           userId: 1,
-          user: {},
-          goals: [],
         },
       ];
 
+      const total = 15;
+      countStub = sinon.stub(Interval, "count").resolves(total);
       findAllStub = sinon.stub(Interval, "findAll").resolves(intervals);
 
       await intervalController.getAll(req, res, next);
 
+      expect(countStub.calledOnce).to.be.true;
       expect(findAllStub.calledOnce).to.be.true;
+      expect(findAllStub.firstCall.args[0]).to.deep.include({
+        skip: 0,
+        limit: 10,
+      });
       expect(res.status.calledWith(200)).to.be.true;
       expect(res.status().json.calledOnce).to.be.true;
-      expect(res.status().json.args[0][0]).to.deep.include({
+
+      const response = res.status().json.args[0][0];
+      expect(response).to.deep.include({
         status: "success",
         results: intervals.length,
         data: intervals,
+      });
+      expect(response).to.have.property("pagination");
+      expect(response.pagination).to.deep.include({
+        total: 15,
+        totalPages: 2,
+        currentPage: 1,
+        pageSize: 10,
+        hasNext: true,
+        hasPrev: false,
       });
     });
 
     it("dovrebbe applicare i filtri se specificati", async () => {
       req.query = {
+        page: 1,
+        limit: 10,
         startDate: "2023-09-01",
         endDate: "2023-09-30",
         goalId: "1",
@@ -209,30 +234,33 @@ describe("Interval Controller", () => {
           startDate: "2023-09-01",
           endDate: "2023-09-30",
           userId: 1,
-          user: {},
-          goals: [{ id: 1 }],
         },
       ];
 
+      countStub = sinon.stub(Interval, "count").resolves(1);
       findAllStub = sinon.stub(Interval, "findAll").resolves(intervals);
 
       await intervalController.getAll(req, res, next);
 
+      expect(countStub.calledOnce).to.be.true;
       expect(findAllStub.calledOnce).to.be.true;
-      expect(
-        findAllStub.calledWith({
-          startDate: "2023-09-01",
-          endDate: "2023-09-30",
-          goalId: "1",
-        })
-      ).to.be.true;
-      expect(res.status.calledWith(200)).to.be.true;
-      expect(res.status().json.calledOnce).to.be.true;
+      expect(countStub.firstCall.args[0]).to.deep.include({
+        startDate: "2023-09-01",
+        endDate: "2023-09-30",
+        goalId: "1",
+      });
+      expect(findAllStub.firstCall.args[0]).to.deep.include({
+        skip: 0,
+        limit: 10,
+        startDate: "2023-09-01",
+        endDate: "2023-09-30",
+        goalId: "1",
+      });
     });
 
     it("dovrebbe chiamare next con errore se si verifica un'eccezione", async () => {
       const error = new Error("Database error");
-      findAllStub = sinon.stub(Interval, "findAll").throws(error);
+      countStub = sinon.stub(Interval, "count").throws(error);
 
       await intervalController.getAll(req, res, next);
 
@@ -248,13 +276,6 @@ describe("Interval Controller", () => {
         startDate: "2023-09-01",
         endDate: "2023-09-30",
         userId: 1,
-        user: {
-          id: 1,
-          firstName: "Test",
-          lastName: "User",
-          email: "test@example.com",
-        },
-        goals: [],
       };
 
       req.params.id = 1;
@@ -284,6 +305,94 @@ describe("Interval Controller", () => {
     });
   });
 
+  describe("getIntervalGoals", () => {
+    it("dovrebbe ottenere tutti gli obiettivi di un intervallo con paginazione", async () => {
+      req.params.id = 1;
+      req.query = { page: 1, limit: 10 };
+
+      const interval = {
+        id: 1,
+        startDate: "2023-09-01",
+        endDate: "2023-09-30",
+        userId: 1,
+      };
+
+      const goals = [
+        {
+          id: 1,
+          name: "Meditazione quotidiana",
+          description: "Pratica 15 minuti di meditazione ogni giorno",
+        },
+        {
+          id: 2,
+          name: "Attività fisica",
+          description:
+            "Almeno 30 minuti di esercizio fisico 3 volte a settimana",
+        },
+      ];
+
+      const total = 5;
+
+      findByIdStub = sinon.stub(Interval, "findById").resolves(interval);
+      countGoalsStub = sinon.stub(Interval, "countGoals").resolves(total);
+      getGoalsStub = sinon.stub(Interval, "getGoals").resolves(goals);
+
+      await intervalController.getIntervalGoals(req, res, next);
+
+      expect(findByIdStub.calledOnce).to.be.true;
+      expect(findByIdStub.calledWith(req.params.id)).to.be.true;
+      expect(countGoalsStub.calledOnce).to.be.true;
+      expect(countGoalsStub.calledWith(req.params.id)).to.be.true;
+      expect(getGoalsStub.calledOnce).to.be.true;
+      expect(getGoalsStub.firstCall.args[0]).to.equal(req.params.id);
+      expect(getGoalsStub.firstCall.args[1]).to.deep.include({
+        skip: 0,
+        limit: 10,
+      });
+
+      expect(res.status.calledWith(200)).to.be.true;
+      expect(res.status().json.calledOnce).to.be.true;
+
+      const response = res.status().json.args[0][0];
+      expect(response).to.deep.include({
+        status: "success",
+        results: goals.length,
+        data: goals,
+      });
+      expect(response).to.have.property("pagination");
+      expect(response.pagination).to.deep.include({
+        total: 5,
+        totalPages: 1,
+        currentPage: 1,
+        pageSize: 10,
+        hasNext: false,
+        hasPrev: false,
+      });
+    });
+
+    it("dovrebbe restituire un errore 404 se l'intervallo non esiste", async () => {
+      req.params.id = 999;
+      findByIdStub = sinon.stub(Interval, "findById").resolves(null);
+
+      await intervalController.getIntervalGoals(req, res, next);
+
+      expect(findByIdStub.calledOnce).to.be.true;
+      expect(res.status.calledWith(404)).to.be.true;
+      expect(res.status().json.calledOnce).to.be.true;
+    });
+
+    it("dovrebbe chiamare next con errore se si verifica un'eccezione", async () => {
+      req.params.id = 1;
+      const error = new Error("Database error");
+      findByIdStub = sinon.stub(Interval, "findById").throws(error);
+
+      await intervalController.getIntervalGoals(req, res, next);
+
+      expect(next.calledOnce).to.be.true;
+      expect(next.calledWith(error)).to.be.true;
+    });
+  });
+
   describe("associateGoal", () => {
     it("dovrebbe associare un obiettivo a un intervallo con successo", async () => {
       req.params.id = 1;
@@ -299,9 +408,7 @@ describe("Interval Controller", () => {
       const association = { id: 1, intervalId: 1, goalId: 2 };
 
       findByIdStub = sinon.stub(Interval, "findById").resolves(interval);
-      const goalFindByIdStub = sinon
-        .stub(require("../models/Goal"), "findById")
-        .resolves(goal);
+      const goalFindByIdStub = sinon.stub(Goal, "findById").resolves(goal);
       intervalGoalAssociateStub = sinon
         .stub(IntervalGoal, "associate")
         .resolves(association);
@@ -314,8 +421,39 @@ describe("Interval Controller", () => {
       expect(res.status.calledWith(201)).to.be.true;
       expect(res.status().json.calledOnce).to.be.true;
 
-      // Ripristina stub
       goalFindByIdStub.restore();
+    });
+  });
+
+  describe("dissociateGoal", () => {
+    it("dovrebbe dissociare un obiettivo da un intervallo con successo", async () => {
+      req.params.id = 1;
+      req.params.goalId = 2;
+
+      const interval = {
+        id: 1,
+        startDate: "2023-09-01",
+        endDate: "2023-09-30",
+        userId: 1,
+      };
+      const goal = { id: 2, name: "Test Goal" };
+
+      findByIdStub = sinon.stub(Interval, "findById").resolves(interval);
+      const goalFindByIdStub = sinon.stub(Goal, "findById").resolves(goal);
+      const intervalGoalDissociateStub = sinon
+        .stub(IntervalGoal, "dissociate")
+        .resolves(true);
+
+      await intervalController.dissociateGoal(req, res, next);
+
+      expect(findByIdStub.calledOnce).to.be.true;
+      expect(goalFindByIdStub.calledOnce).to.be.true;
+      expect(intervalGoalDissociateStub.calledOnce).to.be.true;
+      expect(res.status.calledWith(200)).to.be.true;
+      expect(res.status().json.calledOnce).to.be.true;
+
+      goalFindByIdStub.restore();
+      intervalGoalDissociateStub.restore();
     });
   });
 });

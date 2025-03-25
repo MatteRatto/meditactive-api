@@ -3,11 +3,11 @@ const db = require("../config/database");
 class User {
   /**
    * Crea un nuovo utente
-   * @param {Object} userData - Dati dell'utente
-   * @param {string} userData.email - Email dell'utente
-   * @param {string} userData.firstName - Nome dell'utente
-   * @param {string} userData.lastName - Cognome dell'utente
-   * @returns {Promise<Object>} - Utente creato
+   * @param {Object} userData
+   * @param {string} userData.email
+   * @param {string} userData.firstName
+   * @param {string} userData.lastName
+   * @returns {Promise<Object>}
    */
   static async create(userData) {
     const { email, firstName, lastName } = userData;
@@ -29,8 +29,8 @@ class User {
 
   /**
    * Trova un utente per ID
-   * @param {number} id - ID dell'utente
-   * @returns {Promise<Object|null>} - Utente trovato o null
+   * @param {number} id
+   * @returns {Promise<Object|null>}
    */
   static async findById(id) {
     const sql = `
@@ -62,17 +62,83 @@ class User {
   }
 
   /**
-   * Trova tutti gli utenti
-   * @returns {Promise<Array>}
+   * Conta tutti gli utenti che corrispondono ai filtri
+   * @param {Object} [filters]
+   * @returns {Promise<number>}
    */
-  static async findAll() {
-    const sql = `
-      SELECT id, email, firstName, lastName, createdAt, updatedAt
+  static async count(filters = {}) {
+    let sql = `
+      SELECT COUNT(*) AS total
       FROM users
-      ORDER BY lastName, firstName
     `;
 
-    return await db.query(sql);
+    const conditions = [];
+    const values = [];
+
+    if (filters.email) {
+      conditions.push("email LIKE ?");
+      values.push(`%${filters.email}%`);
+    }
+
+    if (filters.firstName) {
+      conditions.push("firstName LIKE ?");
+      values.push(`%${filters.firstName}%`);
+    }
+
+    if (filters.lastName) {
+      conditions.push("lastName LIKE ?");
+      values.push(`%${filters.lastName}%`);
+    }
+
+    if (conditions.length > 0) {
+      sql += ` WHERE ${conditions.join(" AND ")}`;
+    }
+
+    const result = await db.query(sql, values);
+    return result[0].total;
+  }
+
+  /**
+   * Trova tutti gli utenti con supporto per paginazione
+   * @param {Object} [options]
+   * @param {number} [options.skip=0]
+   * @param {number} [options.limit=10]
+   * @param {Object} [options.filters]
+   * @returns {Promise<Array>}
+   */
+  static async findAll({ skip = 0, limit = 10, ...filters } = {}) {
+    let sql = `
+    SELECT id, email, firstName, lastName, createdAt, updatedAt
+    FROM users
+  `;
+
+    const conditions = [];
+    const values = [];
+
+    if (filters.email) {
+      conditions.push("email LIKE ?");
+      values.push(`%${filters.email}%`);
+    }
+
+    if (filters.firstName) {
+      conditions.push("firstName LIKE ?");
+      values.push(`%${filters.firstName}%`);
+    }
+
+    if (filters.lastName) {
+      conditions.push("lastName LIKE ?");
+      values.push(`%${filters.lastName}%`);
+    }
+
+    if (conditions.length > 0) {
+      sql += ` WHERE ${conditions.join(" AND ")}`;
+    }
+
+    sql += ` ORDER BY lastName, firstName`;
+
+    sql += ` LIMIT ${parseInt(skip, 10)}, ${parseInt(limit, 10)}`;
+
+    return await db.query(sql, values);
   }
 
   /**

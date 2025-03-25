@@ -8,7 +8,7 @@ const router = express.Router();
 
 /**
  * @route GET /api/intervals
- * @desc Ottiene tutti gli intervalli con filtri opzionali
+ * @desc Ottiene tutti gli intervalli con filtri opzionali e paginazione
  * @access Public
  */
 router.get("/", intervalValidations.filter, intervalController.getAll);
@@ -19,13 +19,6 @@ router.get("/", intervalValidations.filter, intervalController.getAll);
  * @access Public
  */
 router.get("/:id", intervalValidations.getOne, intervalController.getOne);
-
-/**
- * @route GET /api/intervals/user/:userId
- * @desc Ottiene tutti gli intervalli di un utente
- * @access Public
- */
-router.get("/user/:userId", intervalController.getByUserId);
 
 /**
  * @route POST /api/intervals
@@ -49,6 +42,13 @@ router.put("/:id", intervalValidations.update, intervalController.update);
 router.delete("/:id", intervalValidations.delete, intervalController.delete);
 
 /**
+ * @route GET /api/intervals/:id/goals
+ * @desc Ottiene tutti gli obiettivi associati a un intervallo con paginazione
+ * @access Public
+ */
+router.get("/:id/goals", intervalController.getIntervalGoals);
+
+/**
  * @route POST /api/intervals/:id/goals
  * @desc Associa un obiettivo a un intervallo
  * @access Public
@@ -67,10 +67,3 @@ router.post(
 router.delete("/:id/goals/:goalId", intervalController.dissociateGoal);
 
 module.exports = router;
-
-/**
- * @route GET /api/intervals/:id/goals
- * @desc Ottiene tutti gli obiettivi associati a un intervallo
- * @access Public
- */
-router.get("/:id/goals", intervalController.getIntervalGoals);

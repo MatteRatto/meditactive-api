@@ -5,7 +5,7 @@ const router = express.Router();
 
 /**
  * @route GET /api/users
- * @desc Ottiene tutti gli utenti
+ * @desc Ottiene tutti gli utenti con paginazione
  * @access Public
  */
 router.get("/", userController.getAll);
@@ -16,6 +16,20 @@ router.get("/", userController.getAll);
  * @access Public
  */
 router.get("/:id", userValidations.getOne, userController.getOne);
+
+/**
+ * @route GET /api/users/:id/intervals
+ * @desc Ottiene tutti gli intervalli di un utente con paginazione
+ * @access Public
+ */
+router.get("/:id/intervals", userController.getUserIntervals);
+
+/**
+ * @route GET /api/users/:id/goals
+ * @desc Ottiene tutti gli obiettivi di un utente con paginazione
+ * @access Public
+ */
+router.get("/:id/goals", userController.getUserGoals);
 
 /**
  * @route POST /api/users

@@ -43,17 +43,62 @@ class Goal {
   }
 
   /**
-   * Trova tutti gli obiettivi
-   * @returns {Promise<Array>}
+   * Conta tutti gli obiettivi che corrispondono ai filtri
+   * @param {Object} [filters]
+   * @returns {Promise<number>}
    */
-  static async findAll() {
-    const sql = `
-      SELECT id, name, description, createdAt, updatedAt
+  static async count(filters = {}) {
+    let sql = `
+      SELECT COUNT(*) AS total
       FROM goals
-      ORDER BY name
     `;
 
-    return await db.query(sql);
+    const conditions = [];
+    const values = [];
+
+    if (filters.name) {
+      conditions.push("name LIKE ?");
+      values.push(`%${filters.name}%`);
+    }
+
+    if (conditions.length > 0) {
+      sql += ` WHERE ${conditions.join(" AND ")}`;
+    }
+
+    const result = await db.query(sql, values);
+    return result[0].total;
+  }
+
+  /**
+   * Trova tutti gli obiettivi con supporto per paginazione
+   * @param {Object} [options]
+   * @param {number} [options.skip=0]
+   * @param {number} [options.limit=10]
+   * @param {Object} [options.filters]
+   * @returns {Promise<Array>}
+   */
+  static async findAll({ skip = 0, limit = 10, ...filters } = {}) {
+    let sql = `
+      SELECT id, name, description, createdAt, updatedAt
+      FROM goals
+    `;
+
+    const conditions = [];
+    const values = [];
+
+    if (filters.name) {
+      conditions.push("name LIKE ?");
+      values.push(`%${filters.name}%`);
+    }
+
+    if (conditions.length > 0) {
+      sql += ` WHERE ${conditions.join(" AND ")}`;
+    }
+
+    sql += ` ORDER BY name`;
+    sql += ` LIMIT ${parseInt(skip, 10)}, ${parseInt(limit, 10)}`;
+
+    return await db.query(sql, values);
   }
 
   /**
@@ -130,6 +175,46 @@ class Goal {
     `;
 
     return await db.query(sql, [intervalId]);
+  }
+
+  /**
+   * Trova tutti gli obiettivi di un utente (attraverso gli intervalli)
+   * @param {number} userId
+   * @param {Object} [options]
+   * @param {number} [options.skip=0]
+   * @param {number} [options.limit=10]
+   * @returns {Promise<Array>}
+   */
+  static async findByUserId(userId, { skip = 0, limit = 10 } = {}) {
+    const sql = `
+      SELECT DISTINCT g.id, g.name, g.description, g.createdAt, g.updatedAt
+      FROM goals g
+      JOIN interval_goals ig ON g.id = ig.goalId
+      JOIN intervals i ON ig.intervalId = i.id
+      WHERE i.userId = ?
+      ORDER BY g.name
+      LIMIT ${parseInt(skip, 10)}, ${parseInt(limit, 10)}
+    `;
+
+    return await db.query(sql, [userId]);
+  }
+
+  /**
+   * Conta tutti gli obiettivi di un utente
+   * @param {number} userId
+   * @returns {Promise<number>}
+   */
+  static async countByUserId(userId) {
+    const sql = `
+      SELECT COUNT(DISTINCT g.id) AS total
+      FROM goals g
+      JOIN interval_goals ig ON g.id = ig.goalId
+      JOIN intervals i ON ig.intervalId = i.id
+      WHERE i.userId = ?
+    `;
+
+    const result = await db.query(sql, [userId]);
+    return result[0].total;
   }
 }
 

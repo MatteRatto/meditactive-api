@@ -12,7 +12,7 @@ describe("Goal Controller", () => {
     findAllStub,
     updateStub,
     deleteStub,
-    findByIntervalIdStub;
+    countStub;
 
   beforeEach(() => {
     if (findByIdStub) findByIdStub.restore();
@@ -20,7 +20,7 @@ describe("Goal Controller", () => {
     if (findAllStub) findAllStub.restore();
     if (updateStub) updateStub.restore();
     if (deleteStub) deleteStub.restore();
-    if (findByIntervalIdStub) findByIntervalIdStub.restore();
+    if (countStub) countStub.restore();
 
     req = {
       body: {},
@@ -82,7 +82,9 @@ describe("Goal Controller", () => {
   });
 
   describe("getAll", () => {
-    it("dovrebbe ottenere tutti gli obiettivi con successo", async () => {
+    it("dovrebbe ottenere tutti gli obiettivi con paginazione", async () => {
+      req.query = { page: 1, limit: 10 };
+
       const goals = [
         {
           id: 1,
@@ -97,23 +99,85 @@ describe("Goal Controller", () => {
         },
       ];
 
+      // Totale: 15 obiettivi, 2 pagine
+      const total = 15;
+      countStub = sinon.stub(Goal, "count").resolves(total);
       findAllStub = sinon.stub(Goal, "findAll").resolves(goals);
 
       await goalController.getAll(req, res, next);
 
+      expect(countStub.calledOnce).to.be.true;
       expect(findAllStub.calledOnce).to.be.true;
+      expect(findAllStub.firstCall.args[0]).to.deep.include({
+        skip: 0,
+        limit: 10,
+      });
       expect(res.status.calledWith(200)).to.be.true;
       expect(res.status().json.calledOnce).to.be.true;
-      expect(res.status().json.args[0][0]).to.deep.include({
+
+      const response = res.status().json.args[0][0];
+      expect(response).to.deep.include({
         status: "success",
         results: goals.length,
         data: goals,
+      });
+      expect(response).to.have.property("pagination");
+      expect(response.pagination).to.deep.include({
+        total: 15,
+        totalPages: 2,
+        currentPage: 1,
+        pageSize: 10,
+        hasNext: true,
+        hasPrev: false,
+      });
+    });
+
+    it("dovrebbe usare i valori predefiniti per page e limit se non specificati", async () => {
+      req.query = {};
+
+      const goals = [
+        { id: 1, name: "Meditazione quotidiana" },
+        { id: 2, name: "Attività fisica" },
+      ];
+
+      countStub = sinon.stub(Goal, "count").resolves(5);
+      findAllStub = sinon.stub(Goal, "findAll").resolves(goals);
+
+      await goalController.getAll(req, res, next);
+
+      expect(findAllStub.firstCall.args[0]).to.deep.include({
+        skip: 0,
+        limit: 10,
+      });
+    });
+
+    it("dovrebbe applicare correttamente i filtri", async () => {
+      req.query = {
+        page: 1,
+        limit: 10,
+        name: "Meditazione",
+      };
+
+      const goals = [{ id: 1, name: "Meditazione quotidiana" }];
+
+      countStub = sinon.stub(Goal, "count").resolves(1);
+      findAllStub = sinon.stub(Goal, "findAll").resolves(goals);
+
+      await goalController.getAll(req, res, next);
+
+      expect(countStub.firstCall.args[0]).to.deep.include({
+        name: "Meditazione",
+      });
+      expect(findAllStub.firstCall.args[0]).to.deep.include({
+        skip: 0,
+        limit: 10,
+        name: "Meditazione",
       });
     });
 
     it("dovrebbe chiamare next con errore se si verifica un'eccezione", async () => {
       const error = new Error("Database error");
-      findAllStub = sinon.stub(Goal, "findAll").throws(error);
+      countStub = sinon.stub(Goal, "count").throws(error);
 
       await goalController.getAll(req, res, next);
 
@@ -244,54 +308,6 @@ describe("Goal Controller", () => {
       expect(findByIdStub.calledOnce).to.be.true;
       expect(res.status.calledWith(404)).to.be.true;
       expect(res.status().json.calledOnce).to.be.true;
-    });
-  });
-
-  describe("getByIntervalId", () => {
-    it("dovrebbe ottenere tutti gli obiettivi di un intervallo", async () => {
-      req.params.intervalId = 1;
-
-      const goals = [
-        {
-          id: 1,
-          name: "Meditazione quotidiana",
-          description: "Pratica 15 minuti di meditazione ogni giorno",
-        },
-        {
-          id: 2,
-          name: "Attività fisica",
-          description:
-            "Almeno 30 minuti di esercizio fisico 3 volte a settimana",
-        },
-      ];
-
-      findByIntervalIdStub = sinon
-        .stub(Goal, "findByIntervalId")
-        .resolves(goals);
-
-      await goalController.getByIntervalId(req, res, next);
-
-      expect(findByIntervalIdStub.calledOnce).to.be.true;
-      expect(findByIntervalIdStub.calledWith(req.params.intervalId)).to.be.true;
-      expect(res.status.calledWith(200)).to.be.true;
-      expect(res.status().json.calledOnce).to.be.true;
-      expect(res.status().json.args[0][0]).to.deep.include({
-        status: "success",
-        results: goals.length,
-        data: goals,
-      });
-    });
-
-    it("dovrebbe chiamare next con errore se si verifica un'eccezione", async () => {
-      req.params.intervalId = 1;
-
-      const error = new Error("Database error");
-      findByIntervalIdStub = sinon.stub(Goal, "findByIntervalId").throws(error);
-
-      await goalController.getByIntervalId(req, res, next);
-
-      expect(next.calledOnce).to.be.true;
-      expect(next.calledWith(error)).to.be.true;
     });
   });
 });

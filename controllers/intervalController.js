@@ -48,12 +48,16 @@ const intervalController = {
   },
 
   /**
-   * Ottiene tutti gli intervalli con filtri opzionali
+   * Ottiene tutti gli intervalli con filtri opzionali e paginazione
    * @route GET /api/intervals
    */
   async getAll(req, res, next) {
     try {
       const { startDate, endDate, goalId } = req.query;
+
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 10;
+      const skip = (page - 1) * limit;
 
       const filters = {};
 
@@ -69,12 +73,29 @@ const intervalController = {
         filters.goalId = goalId;
       }
 
+      filters.skip = skip;
+      filters.limit = limit;
+
+      const total = await Interval.count(filters);
+
       const intervals = await Interval.findAll(filters);
+
+      const totalPages = Math.ceil(total / limit);
+      const hasNext = page < totalPages;
+      const hasPrev = page > 1;
 
       res.status(200).json({
         status: "success",
         results: intervals.length,
         data: intervals,
+        pagination: {
+          total,
+          totalPages,
+          currentPage: page,
+          pageSize: limit,
+          hasNext,
+          hasPrev,
+        },
       });
     } catch (error) {
       next(error);
@@ -178,27 +199,45 @@ const intervalController = {
   },
 
   /**
-   * Ottiene tutti gli intervalli di un utente
-   * @route GET /api/intervals/user/:userId
+   * Ottiene tutti gli obiettivi associati a un intervallo con paginazione
+   * @route GET /api/intervals/:id/goals
    */
-  async getByUserId(req, res, next) {
+  async getIntervalGoals(req, res, next) {
     try {
-      const { userId } = req.params;
+      const { id } = req.params;
 
-      const user = await User.findById(userId);
-      if (!user) {
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 10;
+      const skip = (page - 1) * limit;
+
+      const interval = await Interval.findById(id);
+      if (!interval) {
         return res.status(404).json({
           status: "error",
-          message: "Utente non trovato",
+          message: "Intervallo non trovato",
         });
       }
 
-      const intervals = await Interval.findByUserId(userId);
+      const total = await Interval.countGoals(id);
+
+      const goals = await Interval.getGoals(id, { skip, limit });
+
+      const totalPages = Math.ceil(total / limit);
+      const hasNext = page < totalPages;
+      const hasPrev = page > 1;
 
       res.status(200).json({
         status: "success",
-        results: intervals.length,
-        data: intervals,
+        results: goals.length,
+        data: goals,
+        pagination: {
+          total,
+          totalPages,
+          currentPage: page,
+          pageSize: limit,
+          hasNext,
+          hasPrev,
+        },
       });
     } catch (error) {
       next(error);
@@ -278,34 +317,6 @@ const intervalController = {
       res.status(200).json({
         status: "success",
         message: "Obiettivo dissociato con successo",
-      });
-    } catch (error) {
-      next(error);
-    }
-  },
-
-  /**
-   * Ottiene tutti gli obiettivi associati a un intervallo
-   * @route GET /api/intervals/:id/goals
-   */
-  async getIntervalGoals(req, res, next) {
-    try {
-      const { id } = req.params;
-
-      const interval = await Interval.findById(id);
-      if (!interval) {
-        return res.status(404).json({
-          status: "error",
-          message: "Intervallo non trovato",
-        });
-      }
-
-      const goals = await Interval.getGoals(id);
-
-      res.status(200).json({
-        status: "success",
-        results: goals.length,
-        data: goals,
       });
     } catch (error) {
       next(error);

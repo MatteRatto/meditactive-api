@@ -5,7 +5,7 @@ const router = express.Router();
 
 /**
  * @route GET /api/goals
- * @desc Ottiene tutti gli obiettivi
+ * @desc Ottiene tutti gli obiettivi con paginazione
  * @access Public
  */
 router.get("/", goalController.getAll);
@@ -16,13 +16,6 @@ router.get("/", goalController.getAll);
  * @access Public
  */
 router.get("/:id", goalValidations.getOne, goalController.getOne);
-
-/**
- * @route GET /api/goals/interval/:intervalId
- * @desc Ottiene tutti gli obiettivi di un intervallo
- * @access Public
- */
-router.get("/interval/:intervalId", goalController.getByIntervalId);
 
 /**
  * @route POST /api/goals

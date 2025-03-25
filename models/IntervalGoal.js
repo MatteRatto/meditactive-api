@@ -65,9 +65,12 @@ class IntervalGoal {
   /**
    * Trova tutte le associazioni per un intervallo
    * @param {number} intervalId
+   * @param {Object} [options]
+   * @param {number} [options.skip=0]
+   * @param {number} [options.limit=10]
    * @returns {Promise<Array>}
    */
-  static async findByIntervalId(intervalId) {
+  static async findByIntervalId(intervalId, { skip = 0, limit = 10 } = {}) {
     const sql = `
       SELECT ig.id, ig.intervalId, ig.goalId, ig.createdAt,
              g.name AS goalName, g.description AS goalDescription
@@ -75,17 +78,37 @@ class IntervalGoal {
       JOIN goals g ON ig.goalId = g.id
       WHERE ig.intervalId = ?
       ORDER BY g.name
+      LIMIT ${parseInt(skip, 10)}, ${parseInt(limit, 10)}
     `;
 
     return await db.query(sql, [intervalId]);
   }
 
   /**
+   * Conta tutte le associazioni per un intervallo
+   * @param {number} intervalId
+   * @returns {Promise<number>}
+   */
+  static async countByIntervalId(intervalId) {
+    const sql = `
+      SELECT COUNT(*) AS total
+      FROM interval_goals
+      WHERE intervalId = ?
+    `;
+
+    const result = await db.query(sql, [intervalId]);
+    return result[0].total;
+  }
+
+  /**
    * Trova tutte le associazioni per un obiettivo
    * @param {number} goalId
+   * @param {Object} [options]
+   * @param {number} [options.skip=0]
+   * @param {number} [options.limit=10]
    * @returns {Promise<Array>}
    */
-  static async findByGoalId(goalId) {
+  static async findByGoalId(goalId, { skip = 0, limit = 10 } = {}) {
     const sql = `
       SELECT ig.id, ig.intervalId, ig.goalId, ig.createdAt,
              i.startDate, i.endDate, i.userId
@@ -93,9 +116,26 @@ class IntervalGoal {
       JOIN intervals i ON ig.intervalId = i.id
       WHERE ig.goalId = ?
       ORDER BY i.startDate DESC
+      LIMIT ${parseInt(skip, 10)}, ${parseInt(limit, 10)}
     `;
 
     return await db.query(sql, [goalId]);
+  }
+
+  /**
+   * Conta tutte le associazioni per un obiettivo
+   * @param {number} goalId
+   * @returns {Promise<number>}
+   */
+  static async countByGoalId(goalId) {
+    const sql = `
+      SELECT COUNT(*) AS total
+      FROM interval_goals
+      WHERE goalId = ?
+    `;
+
+    const result = await db.query(sql, [goalId]);
+    return result[0].total;
   }
 
   /**
