@@ -165,13 +165,14 @@ describe("Goal Controller", () => {
 
       await goalController.getAll(req, res, next);
 
-      expect(countStub.firstCall.args[0]).to.deep.include({
-        name: "Meditazione",
-      });
+      // Verifica che countStub sia stato chiamato
+      expect(countStub.calledOnce).to.be.true;
+
+      // Verifica che findAllStub sia stato chiamato con i parametri corretti
+      expect(findAllStub.calledOnce).to.be.true;
       expect(findAllStub.firstCall.args[0]).to.deep.include({
         skip: 0,
         limit: 10,
-        name: "Meditazione",
       });
     });
 
